@@ -3,6 +3,8 @@ from hmmlearn.hmm import GaussianHMM
 from data_loader import load_data, add_features
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('TkAgg')
 
 def train_hmm():
     data = load_data()
@@ -27,6 +29,8 @@ def train_hmm():
 
     return data, model, X
 def plot_regimes(data):
+    import matplotlib.pyplot as plt
+
     plt.figure(figsize=(12,6))
 
     for regime in range(3):
@@ -37,7 +41,9 @@ def plot_regimes(data):
     plt.title("Market Regimes")
     plt.xlabel("Date")
     plt.ylabel("Price")
-    plt.show()
+
+    plt.show(block=True)   # 🔥 important
+    
 def analyze_regimes(data):
     print("\nRegime Analysis:\n")
 
@@ -58,18 +64,22 @@ def get_regime_probabilities(model, X):
 if __name__ == "__main__":
     df, model, X = train_hmm()
 
-    print("\nLatest Market State Probabilities:\n")
+    analyze_regimes(df)   # optional but good
+
     latest = df.iloc[-1]
 
-print("\nCurrent Market State:\n")
+    print("\nCurrent Market State:\n")
 
-probs = [
-    float(latest['regime_0_prob'].values[0]),
-    float(latest['regime_1_prob'].values[0]),
-    float(latest['regime_2_prob'].values[0])
-]
+    probs = [
+        float(latest['regime_0_prob'].values[0]),
+        float(latest['regime_1_prob'].values[0]),
+        float(latest['regime_2_prob'].values[0])
+    ]
 
-regime_names = ["Crash", "Bull", "Sideways"]
+    regime_names = ["Crash", "Bull", "Sideways"]
 
-for i in range(3):
-    print(f"{regime_names[i]}: {probs[i]:.2f}")
+    for i in range(3):
+        print(f"{regime_names[i]}: {probs[i]:.2f}")
+
+    # 🚨 THIS LINE MUST EXIST
+    plot_regimes(df)
