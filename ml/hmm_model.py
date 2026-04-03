@@ -1,85 +1,137 @@
 import pandas as pd
+import numpy as np
 from hmmlearn.hmm import GaussianHMM
 from data_loader import load_data, add_features
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
 
+
+# 🔥 Advanced feature engineering
+def add_advanced_features(data):
+    data['momentum'] = data['Close'].pct_change(5)
+
+    data['ma_short'] = data['Close'].rolling(10).mean()
+    data['ma_long'] = data['Close'].rolling(30).mean()
+    data['ma_signal'] = data['ma_short'] - data['ma_long']
+
+    data['vol_change'] = data['volatility'].pct_change()
+
+    data = data.dropna()
+    return data
+
+
+# 🚀 Train improved HMM
 def train_hmm():
     data = load_data()
     data = add_features(data)
 
-    X = data[['returns', 'volatility']].values
+    # Clean multi-index columns
+    data.columns = [col[0] if isinstance(col, tuple) else col for col in data.columns]
 
-    model = GaussianHMM(n_components=3, covariance_type="full", n_iter=300)
+    # Add advanced features
+    data = add_advanced_features(data)
 
-    # ✅ TRAIN MODEL FIRST
-    model.fit(X)
+    features = ['returns', 'volatility', 'momentum', 'ma_signal', 'vol_change']
+    X = data[features].values
 
-    # THEN predict
-    hidden_states = model.predict(X)
+    # Scale features (important)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    model = GaussianHMM(
+        n_components=3,
+        covariance_type="full",
+        n_iter=500,
+        random_state=42
+    )
+
+    model.fit(X_scaled)
+
+    hidden_states = model.predict(X_scaled)
     data['regime'] = hidden_states
 
-    # Probabilities
-    probs = model.predict_proba(X)
+    probs = model.predict_proba(X_scaled)
     data['regime_0_prob'] = probs[:, 0]
     data['regime_1_prob'] = probs[:, 1]
     data['regime_2_prob'] = probs[:, 2]
 
-    return data, model, X
-def plot_regimes(data):
-    import matplotlib.pyplot as plt
+    return data
 
-    plt.figure(figsize=(12,6))
 
-    for regime in range(3):
-        subset = data[data['regime'] == regime]
-        plt.scatter(subset.index, subset['Close'], label=f'Regime {regime}')
-
-    plt.legend()
-    plt.title("Market Regimes")
-    plt.xlabel("Date")
-    plt.ylabel("Price")
-
-    plt.show(block=True)   # 🔥 important
-    
+# 📊 Analyze regimes
 def analyze_regimes(data):
     print("\nRegime Analysis:\n")
 
     for i in range(3):
         subset = data[data['regime'] == i]
 
-        avg_return = subset['returns'].mean()
-        avg_vol = subset['volatility'].mean()
-
         print(f"Regime {i}:")
-        print(f"  Avg Return: {avg_return:.5f}")
-        print(f"  Avg Volatility: {avg_vol:.5f}")
+        print(f"  Avg Return: {subset['returns'].mean():.5f}")
+        print(f"  Avg Volatility: {subset['volatility'].mean():.5f}")
         print()
-def get_regime_probabilities(model, X):
-    probs = model.predict_proba(X)
-    return probs
 
+
+# 🧠 Label regimes automatically
+def label_regimes(data):
+    stats = {}
+
+    for i in range(3):
+        subset = data[data['regime'] == i]
+        stats[i] = (
+            subset['returns'].mean(),
+            subset['volatility'].mean()
+        )
+
+    labels = {}
+
+    for k, (ret, vol) in stats.items():
+        if ret > 0 and vol < 0.01:
+            labels[k] = "Bull 🟢"
+        elif ret < 0 and vol > 0.015:
+            labels[k] = "Crash 🔴"
+        else:
+            labels[k] = "Sideways 🟡"
+
+    return labels
+
+
+# 📈 Plot regimes
+def plot_regimes(data, labels):
+    plt.figure(figsize=(12,6))
+
+    for regime in range(3):
+        subset = data[data['regime'] == regime]
+        plt.scatter(subset.index, subset['Close'], label=labels[regime])
+
+    plt.legend()
+    plt.title("Market Regimes (Upgraded Model)")
+    plt.xlabel("Date")
+    plt.ylabel("Price")
+
+    plt.show(block=True)
+
+
+# ▶️ MAIN EXECUTION
 if __name__ == "__main__":
-    df, model, X = train_hmm()
+    df = train_hmm()
 
-    analyze_regimes(df)   # optional but good
+    analyze_regimes(df)
+
+    labels = label_regimes(df)
 
     latest = df.iloc[-1]
 
     print("\nCurrent Market State:\n")
 
     probs = [
-        float(latest['regime_0_prob'].values[0]),
-        float(latest['regime_1_prob'].values[0]),
-        float(latest['regime_2_prob'].values[0])
+        float(latest['regime_0_prob']),
+        float(latest['regime_1_prob']),
+        float(latest['regime_2_prob'])
     ]
 
-    regime_names = ["Crash", "Bull", "Sideways"]
-
     for i in range(3):
-        print(f"{regime_names[i]}: {probs[i]:.2f}")
+        print(f"{labels[i]}: {probs[i]:.2f}")
 
-    # 🚨 THIS LINE MUST EXIST
-    plot_regimes(df)
+    plot_regimes(df, labels)
