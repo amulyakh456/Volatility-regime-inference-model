@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 import numpy as np
 from hmmlearn.hmm import GaussianHMM
 from data_loader import load_data, add_features
@@ -102,7 +103,7 @@ def plot_regimes(data, labels):
         plt.scatter(subset.index, subset['Close'], label=labels[regime])
 
     plt.legend()
-    plt.title("Market Regimes (Upgraded Model)")
+    plt.title("Market Regimes")
     plt.xlabel("Date")
     plt.ylabel("Price")
 
@@ -177,7 +178,32 @@ def plot_strategy(data):
 
     plt.show(block=True)
 
+import os
 
+def export_regimes(data):
+
+    # Get project root (ml_proj)
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # Path to data folder
+    data_dir = os.path.join(BASE_DIR, "data")
+
+    os.makedirs(data_dir, exist_ok=True)
+
+    output_path = os.path.join(data_dir, "regime_output.csv")
+
+    df_out = pd.DataFrame({
+        "date": data.index,
+        "bull": data["regime_2_prob"],
+        "crash": data["regime_0_prob"],
+        "sideways": data["regime_1_prob"]
+    })
+
+    df_out = df_out.reset_index(drop=True)
+
+    df_out.to_csv(output_path, index=False)
+
+    print("✅ Regime probabilities exported to:", output_path)
 # 🚀 MAIN
 if __name__ == "__main__":
     df = train_hmm()
@@ -216,5 +242,7 @@ if __name__ == "__main__":
 
     evaluate_strategy(df)
 
+    export_regimes(df)
     plot_regimes(df, labels)
     plot_strategy(df)
+    
